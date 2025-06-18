@@ -1,6 +1,6 @@
 # Wild West Duel Game
 
-A realistic dueling game where you face off against an NPC in a classic Wild West shootout with quick-draw arm animations, pistols, realistic ballistic physics, and a health system.
+A realistic dueling game where you face off against an NPC in a classic Wild West shootout with randomized terrain, quick-draw arm animations, pistols, realistic ballistic physics, and a health system.
 
 ## Requirements
 
@@ -32,38 +32,49 @@ A realistic dueling game where you face off against an NPC in a classic Wild Wes
 
 ## Gameplay
 
-1. **Aiming Phase**:
+1. **Randomized Terrain**:
+   - Each game features a unique terrain with hills of varying heights
+   - Both duelists are always positioned on top of hills
+   - The terrain remains consistent throughout all rounds of a match
+   - New terrain is only generated when starting a new game
+   - Hills affect bullet trajectories and provide strategic advantages
+
+2. **Aiming Phase**:
    - Use UP/DOWN arrow keys to precisely adjust your aim angle
    - A red crosshair reticle shows where you're aiming
    - Your arm starts in a downward position at your side
    - The NPC will also be adjusting their aim
    - Press SPACE when you're ready to start the countdown
 
-2. **Countdown**:
+3. **Countdown**:
    - A 3-second countdown will begin (3, 2, 1)
    - During the countdown, both duelists perform a quick-draw motion
    - Arms rapidly raise from their sides to their aiming positions
    - Watch as the arms animate in a classic quick-draw style
 
-3. **Simultaneous Shooting**:
+4. **Simultaneous Shooting**:
    - Both you and the NPC fire automatically when the countdown reaches zero
    - Bullets shoot from the tips of the pistols
-   - Watch as both bullets travel through the air
+   - Watch as both bullets travel through the air, affected by gravity and terrain
    - See if either shot hits its target
 
-4. **Damage System**:
+5. **Damage System**:
    - Each duelist has 100 health points
    - Headshots deal 40 damage
    - Body shots deal 20 damage
    - Missed shots deal no damage
 
-5. **Results**:
+6. **Results**:
    - After each round, damage is calculated and health is updated
-   - The game continues with another round until someone's health reaches zero
+   - The game continues with another round on the same terrain
+   - Players return to their original positions for each new round
    - The first duelist to reduce their opponent's health to zero wins
 
 ## Game Features
 
+- Randomized terrain with hills of varying heights
+- Strategic positioning on hills for better shooting angles
+- Consistent terrain throughout a match for strategic planning
 - Classic quick-draw arm animation from side to aiming position
 - Pistols that fire from their actual positions
 - Simplified controls focusing only on angle adjustment
@@ -83,6 +94,7 @@ A realistic dueling game where you face off against an NPC in a classic Wild Wes
 
 ## Physics Elements
 
+- **Terrain**: Hills affect bullet trajectories and starting positions
 - **Gravity**: Bullets are affected by gravity and follow a parabolic trajectory
 - **Fixed Velocity**: All bullets travel at the same speed
 - **Angle**: Determines the launch angle of the bullet with precise 0.10 degree control
@@ -91,6 +103,8 @@ A realistic dueling game where you face off against an NPC in a classic Wild Wes
 
 ## Strategy Tips
 
+- Learn the terrain of each match and use it to your advantage
+- Higher ground gives better shooting angles - adjust your strategy accordingly
 - Use the fine angle control to precisely aim for headshots
 - Hold down the arrow keys for smooth, continuous adjustments
 - Try to predict where your opponent will be aiming

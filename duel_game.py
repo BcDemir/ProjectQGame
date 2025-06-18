@@ -8,7 +8,7 @@ import math
 pygame.init()
 
 # Screen dimensions
-WIDTH, HEIGHT = 800, 600
+WIDTH, HEIGHT = 1920, 1080
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Wild West Duel")
 
@@ -24,13 +24,73 @@ YELLOW = (255, 255, 0)
 DARK_GRAY = (50, 50, 50)
 
 # Load fonts
-font_large = pygame.font.SysFont('Arial', 72)
-font_medium = pygame.font.SysFont('Arial', 36)
-font_small = pygame.font.SysFont('Arial', 24)
+font_large = pygame.font.SysFont('Arial', 120)  # Increased from 72
+font_medium = pygame.font.SysFont('Arial', 48)  # Increased from 36
+font_small = pygame.font.SysFont('Arial', 36)   # Increased from 24
 
 # Physics constants
 GRAVITY = 0.3  # Reduced gravity to account for longer distances
-GROUND_LEVEL = HEIGHT - 100
+BASE_GROUND_LEVEL = HEIGHT - 200  # Base ground level for higher resolution
+
+# Terrain generation parameters
+MAX_HILL_HEIGHT = 150  # Maximum height of hills
+MIN_HILL_HEIGHT = 30   # Minimum height of hills
+HILL_WIDTH_RANGE = (200, 400)  # Range of hill widths
+CENTER_GAP = 600  # Gap in the center to ensure line of sight
+
+# Terrain class to handle the ground and hills
+class Terrain:
+    def __init__(self):
+        self.ground_level = BASE_GROUND_LEVEL
+        self.hills = []  # List of hills [(x, y, width, height), ...]
+        self.generate_terrain()
+        
+    def generate_terrain(self):
+        self.hills = []
+        
+        # Generate left hill (player side) - ensure player is on a hill
+        left_hill_height = random.randint(MIN_HILL_HEIGHT, MAX_HILL_HEIGHT)
+        left_hill_width = random.randint(*HILL_WIDTH_RANGE)
+        # Position the hill so the player is centered on it
+        player_x = 50
+        left_hill_x = max(0, player_x - left_hill_width // 2)
+        self.hills.append((left_hill_x, BASE_GROUND_LEVEL - left_hill_height, left_hill_width, left_hill_height))
+        
+        # Generate right hill (NPC side) - ensure NPC is on a hill
+        right_hill_height = random.randint(MIN_HILL_HEIGHT, MAX_HILL_HEIGHT)
+        right_hill_width = random.randint(*HILL_WIDTH_RANGE)
+        # Position the hill so the NPC is centered on it
+        npc_x = WIDTH - 110
+        right_hill_x = max(0, npc_x - right_hill_width // 2)
+        self.hills.append((right_hill_x, BASE_GROUND_LEVEL - right_hill_height, right_hill_width, right_hill_height))
+        
+        # Randomly decide if we add a middle hill (with lower height to not block view)
+        if random.random() < 0.3:  # 30% chance
+            middle_hill_height = random.randint(MIN_HILL_HEIGHT, MIN_HILL_HEIGHT + 20)
+            middle_hill_width = random.randint(100, 200)
+            middle_hill_x = WIDTH // 2 - middle_hill_width // 2
+            self.hills.append((middle_hill_x, BASE_GROUND_LEVEL - middle_hill_height, middle_hill_width, middle_hill_height))
+    
+    def draw(self, screen):
+        # Draw base ground
+        pygame.draw.rect(screen, BROWN, (0, BASE_GROUND_LEVEL, WIDTH, HEIGHT - BASE_GROUND_LEVEL))
+        
+        # Draw hills
+        for x, y, width, height in self.hills:
+            # Draw hill with a slightly darker color
+            hill_color = (139, 69, 19)  # Darker brown
+            pygame.draw.rect(screen, hill_color, (x, y, width, height))
+            
+            # Draw grass on top of the hill
+            grass_color = (34, 139, 34)  # Forest green
+            pygame.draw.rect(screen, grass_color, (x, y, width, 10))
+    
+    def get_ground_level_at(self, x):
+        # Return the ground level at position x
+        for hill_x, hill_y, hill_width, hill_height in self.hills:
+            if hill_x <= x < hill_x + hill_width:
+                return hill_y
+        return BASE_GROUND_LEVEL
 
 class Bullet:
     def __init__(self, x, y, angle, speed, is_player):
@@ -40,17 +100,17 @@ class Bullet:
         self.speed = speed
         self.is_player = is_player
         self.active = True
-        self.radius = 3  # Smaller bullet
+        self.radius = 6  # Larger bullet for higher resolution
         self.trail = []  # Store positions for bullet trail
-        self.max_trail_length = 15  # Longer trail for better visibility at distance
+        self.max_trail_length = 20  # Longer trail for better visibility at distance
         
         # Convert angle to radians and calculate velocity components
         angle_rad = math.radians(angle)
-        direction = 1 if is_player else -1
-        self.vx = math.cos(angle_rad) * speed * direction
+        # No need for direction multiplier since we're already using the correct angle for each character
+        self.vx = math.cos(angle_rad) * speed * (1 if is_player else -1)
         self.vy = -math.sin(angle_rad) * speed  # Negative because y increases downward
         
-    def update(self):
+    def update(self, terrain):
         if not self.active:
             return
             
@@ -66,9 +126,10 @@ class Bullet:
         # Apply gravity to vertical velocity
         self.vy += GRAVITY
         
-        # Check if bullet hit ground
-        if self.y > GROUND_LEVEL:
-            self.y = GROUND_LEVEL
+        # Check if bullet hit ground or terrain
+        ground_level_at_bullet = terrain.get_ground_level_at(self.x)
+        if self.y > ground_level_at_bullet:
+            self.y = ground_level_at_bullet
             self.active = False
             
         # Check if bullet is out of bounds
@@ -126,11 +187,14 @@ class Bullet:
         return False
 
 class Player:
+    # Class variable to store terrain reference
+    terrain = None
+    
     def __init__(self, x, y, color, is_player=False):
         self.x = x
         self.y = y
-        self.width = 30  # Reduced from 50
-        self.height = 60  # Reduced from 100
+        self.width = 30  # Reduced from 60 (half size)
+        self.height = 60  # Reduced from 120 (half size)
         self.color = color
         self.has_shot = False
         self.shot_time = 0
@@ -138,16 +202,16 @@ class Player:
         self.health = 100  # Starting health
         self.max_health = 100  # Maximum health
         self.is_player = is_player
-        self.aim_y = y + 25  # Adjusted for smaller height
+        self.aim_y = y + 10  # Adjusted for upper body position (reduced)
         self.aim_direction = 1 if is_player else -1  # 1 for right, -1 for left
         self.aim_angle = 0  # Angle in degrees (0 is horizontal)
-        self.bullet_velocity = 35  # Fixed bullet velocity (was aim_power)
+        self.bullet_velocity = 45  # Increased for larger screen
         
-        # Arm and pistol properties
-        self.arm_length = 25
-        self.arm_width = 5
-        self.pistol_length = 15
-        self.current_arm_angle = -45 * self.aim_direction  # Start downward (-45 degrees)
+        # Arm and pistol properties - keeping these unchanged
+        self.arm_length = 50  # Keeping arm length unchanged
+        self.arm_width = 10  # Keeping arm width unchanged
+        self.pistol_length = 30  # Keeping pistol length unchanged
+        self.current_arm_angle = -45  # Start downward (-45 degrees), no direction multiplier
         self.target_arm_angle = self.aim_angle  # Target angle for animation
         self.arm_animation_speed = 5  # Increased speed for quicker draw
         
@@ -160,15 +224,21 @@ class Player:
         # Draw body
         pygame.draw.rect(screen, self.color, (self.x, self.y, self.width, self.height))
         # Draw head
-        pygame.draw.circle(screen, self.color, (self.x + self.width // 2, self.y - 10), 12)  # Smaller head
+        pygame.draw.circle(screen, self.color, (self.x + self.width // 2, self.y - 10), 12)  # Reduced from 24 to 12 (half size)
         
         # Calculate arm position - moved higher up on the body
         arm_start_x = self.x + self.width // 2
-        arm_start_y = self.y + 10  # Upper part of body (was 25)
+        arm_start_y = self.y + 10  # Upper part of body
         
         # Calculate arm end point based on current arm angle
-        arm_angle_rad = math.radians(self.current_arm_angle * self.aim_direction)
-        arm_end_x = arm_start_x + (self.arm_length * math.cos(arm_angle_rad))
+        # For NPC, we need to flip the angle calculation to make it face the player
+        if self.is_player:
+            arm_angle_rad = math.radians(self.current_arm_angle)
+            arm_end_x = arm_start_x + (self.arm_length * math.cos(arm_angle_rad))
+        else:
+            arm_angle_rad = math.radians(180 - self.current_arm_angle)  # Flip angle for NPC
+            arm_end_x = arm_start_x + (self.arm_length * math.cos(arm_angle_rad))
+            
         arm_end_y = arm_start_y - (self.arm_length * math.sin(arm_angle_rad))
         
         # Draw arm with black outline
@@ -180,31 +250,35 @@ class Player:
                         (arm_end_x, arm_end_y), self.arm_width)
         
         # Calculate pistol position at the end of arm
-        pistol_angle_rad = arm_angle_rad
-        pistol_end_x = arm_end_x + (self.pistol_length * math.cos(pistol_angle_rad))
-        pistol_end_y = arm_end_y - (self.pistol_length * math.sin(pistol_angle_rad))
+        # Use the same angle calculation as for the arm
+        if self.is_player:
+            pistol_end_x = arm_end_x + (self.pistol_length * math.cos(arm_angle_rad))
+        else:
+            pistol_end_x = arm_end_x + (self.pistol_length * math.cos(arm_angle_rad))
+            
+        pistol_end_y = arm_end_y - (self.pistol_length * math.sin(arm_angle_rad))
         
         # Draw pistol
         pygame.draw.line(screen, BLACK, (arm_end_x, arm_end_y), 
-                        (pistol_end_x, pistol_end_y), 3)
+                        (pistol_end_x, pistol_end_y), 6)  # Keeping pistol thickness
         
         # Draw reticle if in aiming phase and is player
         if aiming and self.is_player:
             # Draw reticle
-            reticle_size = 10
+            reticle_size = 15  # Keeping reticle size
             # Outer circle
-            pygame.draw.circle(screen, RED, (int(self.reticle_x), int(self.reticle_y)), reticle_size, 1)
+            pygame.draw.circle(screen, RED, (int(self.reticle_x), int(self.reticle_y)), reticle_size, 2)
             # Inner circle
-            pygame.draw.circle(screen, RED, (int(self.reticle_x), int(self.reticle_y)), reticle_size // 2, 1)
+            pygame.draw.circle(screen, RED, (int(self.reticle_x), int(self.reticle_y)), reticle_size // 2, 2)
             # Crosshairs
             pygame.draw.line(screen, RED, (self.reticle_x - reticle_size, self.reticle_y), 
-                            (self.reticle_x + reticle_size, self.reticle_y), 1)
+                            (self.reticle_x + reticle_size, self.reticle_y), 2)
             pygame.draw.line(screen, RED, (self.reticle_x, self.reticle_y - reticle_size), 
-                            (self.reticle_x, self.reticle_y + reticle_size), 1)
+                            (self.reticle_x, self.reticle_y + reticle_size), 2)
             
             # Draw angle text
             angle_text = font_small.render(f"Angle: {self.aim_angle:.2f}°", True, BLACK)
-            screen.blit(angle_text, (self.x, self.y - 60))
+            screen.blit(angle_text, (self.x, self.y - 50))  # Adjusted position for smaller body
             
     def update_arm_animation(self):
         # Animate the arm to move toward the target angle
@@ -220,7 +294,6 @@ class Player:
                 # Otherwise move in the right direction
                 direction = 1 if angle_diff > 0 else -1
                 self.current_arm_angle += direction * self.arm_animation_speed
-                
     def adjust_aim_angle(self, direction):
         # Adjust aim angle (up/down) with finer control (0.10 degrees per adjustment)
         self.aim_angle += direction * 0.10
@@ -245,7 +318,11 @@ class Player:
         # Update reticle position for visual feedback
         self.update_reticle_position()
         
-    def update_reticle_position(self):
+    def update_reticle_position(self, terrain=None):
+        # Use class terrain if none provided
+        if terrain is None:
+            terrain = Player.terrain
+            
         # Calculate reticle position based on current angle and fixed velocity
         angle_rad = math.radians(self.aim_angle)
         distance_multiplier = 2.5  # Reduced from 5 to make reticle twice as close
@@ -265,8 +342,13 @@ class Player:
         
         # Ensure reticle stays within screen bounds
         self.reticle_x = max(0, min(self.reticle_x, WIDTH))
-        self.reticle_y = max(0, min(self.reticle_y, GROUND_LEVEL))
-            
+        
+        # If terrain is provided, ensure reticle doesn't go below ground
+        if terrain:
+            ground_level_at_reticle = terrain.get_ground_level_at(self.reticle_x)
+            self.reticle_y = min(self.reticle_y, ground_level_at_reticle - 10)  # Keep slightly above ground
+        else:
+            self.reticle_y = max(0, min(self.reticle_y, BASE_GROUND_LEVEL))
     def shoot(self):
         if not self.has_shot:
             self.has_shot = True
@@ -274,23 +356,30 @@ class Player:
             
             # Calculate pistol position at the end of arm - using upper body position
             arm_start_x = self.x + self.width // 2
-            arm_start_y = self.y + 10  # Upper part of body
+            arm_start_y = self.y + 20  # Upper part of body
             
-            arm_angle_rad = math.radians(self.current_arm_angle * self.aim_direction)
-            arm_end_x = arm_start_x + (self.arm_length * math.cos(arm_angle_rad))
+            # Calculate arm and pistol positions with correct angles for both player and NPC
+            if self.is_player:
+                arm_angle_rad = math.radians(self.current_arm_angle)
+                arm_end_x = arm_start_x + (self.arm_length * math.cos(arm_angle_rad))
+                bullet_angle = self.current_arm_angle
+            else:
+                arm_angle_rad = math.radians(180 - self.current_arm_angle)  # Flip angle for NPC
+                arm_end_x = arm_start_x + (self.arm_length * math.cos(arm_angle_rad))
+                bullet_angle = self.current_arm_angle  # Use original angle for NPC bullet
+                
             arm_end_y = arm_start_y - (self.arm_length * math.sin(arm_angle_rad))
             
-            pistol_angle_rad = arm_angle_rad
-            pistol_end_x = arm_end_x + (self.pistol_length * math.cos(pistol_angle_rad))
-            pistol_end_y = arm_end_y - (self.pistol_length * math.sin(pistol_angle_rad))
+            pistol_end_x = arm_end_x + (self.pistol_length * math.cos(arm_angle_rad))
+            pistol_end_y = arm_end_y - (self.pistol_length * math.sin(arm_angle_rad))
             
-            # Create bullet - using fixed velocity and current arm angle
+            # Create bullet - using fixed velocity and correct angle
             self.bullet = Bullet(pistol_end_x, pistol_end_y, 
-                                self.current_arm_angle, self.bullet_velocity, self.is_player)
+                                bullet_angle, self.bullet_velocity, self.is_player)
                 
-    def update_bullet(self):
+    def update_bullet(self, terrain):
         if self.bullet and self.bullet.active:
-            self.bullet.update()
+            self.bullet.update(terrain)
             
     def draw_bullet(self, screen):
         if self.bullet:
@@ -301,12 +390,12 @@ class Player:
             return self.bullet.check_hit(other)
         return False
 
-def draw_scene(player, npc, game_state, mode="simultaneous", countdown=None, winner=None, hit_message=None):
+def draw_scene(player, npc, terrain, game_state, mode="simultaneous", countdown=None, winner=None, hit_message=None):
     # Draw sky
     screen.fill(SKY_BLUE)
     
-    # Draw ground
-    pygame.draw.rect(screen, BROWN, (0, GROUND_LEVEL, WIDTH, HEIGHT - GROUND_LEVEL))
+    # Draw terrain (ground and hills)
+    terrain.draw(screen)
     
     # Draw players - show aiming line for player during aiming phase
     player.draw(screen, game_state == "aiming")
@@ -316,40 +405,40 @@ def draw_scene(player, npc, game_state, mode="simultaneous", countdown=None, win
     player.draw_bullet(screen)
     npc.draw_bullet(screen)
     
-    # Draw health bars
+    # Draw health bars - scaled for higher resolution
     # Player health bar
-    pygame.draw.rect(screen, RED, (50, 20, 200, 20))
-    health_width = int(200 * (player.health / player.max_health))
-    pygame.draw.rect(screen, GREEN, (50, 20, health_width, 20))
+    pygame.draw.rect(screen, RED, (100, 40, 400, 30))
+    health_width = int(400 * (player.health / player.max_health))
+    pygame.draw.rect(screen, GREEN, (100, 40, health_width, 30))
     
     # NPC health bar
-    pygame.draw.rect(screen, RED, (WIDTH - 250, 20, 200, 20))
-    health_width = int(200 * (npc.health / npc.max_health))
-    pygame.draw.rect(screen, GREEN, (WIDTH - 250, 20, health_width, 20))
+    pygame.draw.rect(screen, RED, (WIDTH - 500, 40, 400, 30))
+    health_width = int(400 * (npc.health / npc.max_health))
+    pygame.draw.rect(screen, GREEN, (WIDTH - 500, 40, health_width, 30))
     
     # Draw health numbers
     player_health_text = font_small.render(f"{player.health}/{player.max_health}", True, BLACK)
     npc_health_text = font_small.render(f"{npc.health}/{npc.max_health}", True, BLACK)
-    screen.blit(player_health_text, (50, 45))
-    screen.blit(npc_health_text, (WIDTH - 250, 45))
+    screen.blit(player_health_text, (100, 80))
+    screen.blit(npc_health_text, (WIDTH - 500, 80))
     
     # Draw round indicator
     if game_state != "game_over":
         round_text = font_medium.render("Prepare to Duel!", True, BLACK)
-        screen.blit(round_text, (WIDTH // 2 - 100, 20))
+        screen.blit(round_text, (WIDTH // 2 - 100, 40))
     
     # Draw hit message if available
     if hit_message:
         hit_text = font_medium.render(hit_message, True, RED)
-        screen.blit(hit_text, (WIDTH // 2 - 200, 60))
+        screen.blit(hit_text, (WIDTH // 2 - 200, 100))
     
     # Draw game state specific information
     if game_state == "aiming":
         instructions = font_medium.render("UP/DOWN: Adjust Angle, SPACE: Ready", True, BLACK)
-        screen.blit(instructions, (WIDTH // 2 - 200, 100))
+        screen.blit(instructions, (WIDTH // 2 - 200, 160))
     elif game_state == "countdown" and countdown is not None:
         countdown_text = font_large.render(str(countdown), True, RED)
-        screen.blit(countdown_text, (WIDTH // 2 - 20, HEIGHT // 2 - 50))
+        screen.blit(countdown_text, (WIDTH // 2 - 40, HEIGHT // 2 - 100))
     elif game_state == "game_over" and winner is not None:
         winner_text = font_medium.render(f"{winner} wins!", True, BLACK)
         screen.blit(winner_text, (WIDTH // 2 - 100, HEIGHT // 2 - 50))
@@ -359,9 +448,23 @@ def draw_scene(player, npc, game_state, mode="simultaneous", countdown=None, win
 def main():
     clock = pygame.time.Clock()
     
-    # Create player and NPC with greatly increased distance (3x)
-    player = Player(20, HEIGHT - 150, BLUE, is_player=True)
-    npc = Player(WIDTH - 50, HEIGHT - 150, RED)
+    # Define player and NPC positions
+    player_x = 50
+    npc_x = WIDTH - 110
+    
+    # Create terrain
+    terrain = Terrain()
+    
+    # Set the terrain in the Player class
+    Player.terrain = terrain
+    
+    # Get ground levels for player and NPC positions
+    player_ground_level = terrain.get_ground_level_at(player_x + 15)  # Center of player (half width)
+    npc_ground_level = terrain.get_ground_level_at(npc_x + 15)  # Center of NPC (half width)
+    
+    # Create player and NPC with positions based on terrain
+    player = Player(player_x, player_ground_level - 60, BLUE, is_player=True)  # Height is 60 now
+    npc = Player(npc_x, npc_ground_level - 60, RED)
     
     # Game states: "aiming" -> "countdown" -> "shooting" -> "result" -> back to "aiming" or "game_over"
     game_state = "aiming"
@@ -398,9 +501,24 @@ def main():
         player.has_shot = False
         npc.has_shot = False
         
+        # Define player and NPC positions - keep the same positions
+        player_x = 50
+        npc_x = WIDTH - 110
+        
+        # Keep the same terrain between rounds
+        # Just reset player positions to their original spots
+        player_ground_level = terrain.get_ground_level_at(player_x + 30)
+        npc_ground_level = terrain.get_ground_level_at(npc_x + 30)
+        
+        # Update player positions
+        player.x = player_x
+        player.y = player_ground_level - 120
+        npc.x = npc_x
+        npc.y = npc_ground_level - 120
+        
         # Reset arm positions to downward position
-        player.current_arm_angle = -45 * player.aim_direction
-        npc.current_arm_angle = -45 * npc.aim_direction
+        player.current_arm_angle = -45  # No direction multiplier
+        npc.current_arm_angle = -45  # No direction multiplier
         
         # Reset game state
         game_state = "aiming"
@@ -448,20 +566,36 @@ def main():
                 if game_state == "game_over":
                     if event.key == pygame.K_r:
                         # Reset game completely
-                        player = Player(20, HEIGHT - 150, BLUE, is_player=True)
-                        npc = Player(WIDTH - 50, HEIGHT - 150, RED)
+                        # Define player and NPC positions
+                        player_x = 50
+                        npc_x = WIDTH - 110
+                        
+                        # Generate new terrain
+                        terrain = Terrain()
+                        
+                        # Update the terrain in the Player class
+                        Player.terrain = terrain
+                        
+                        # Get new ground levels
+                        player_ground_level = terrain.get_ground_level_at(player_x + 30)
+                        npc_ground_level = terrain.get_ground_level_at(npc_x + 30)
+                        
+                        # Create new players at the correct heights
+                        player = Player(player_x, player_ground_level - 120, BLUE, is_player=True)
+                        npc = Player(npc_x, npc_ground_level - 120, RED)
                         npc.aim_angle = random.randint(5, 30)
                         game_state = "aiming"
                         winner = None
                         hit_message = None
                         countdown_value = 3
+                        
                         # Reset NPC aim behavior
                         npc_aim_angle_change = random.choice([-1, 0, 1])
                         npc_last_aim_time = pygame.time.get_ticks()
                         
                         # Make sure arms start in downward position
-                        player.current_arm_angle = -45 * player.aim_direction
-                        npc.current_arm_angle = -45 * npc.aim_direction
+                        player.current_arm_angle = -45  # No direction multiplier
+                        npc.current_arm_angle = -45  # No direction multiplier
                     elif event.key == pygame.K_q:
                         running = False
             
@@ -519,8 +653,8 @@ def main():
         
         elif game_state == "shooting":
             # Update both bullets
-            player.update_bullet()
-            npc.update_bullet()
+            player.update_bullet(terrain)
+            npc.update_bullet(terrain)
             
             # Track hits
             player_hit_npc = False
@@ -576,7 +710,7 @@ def main():
                     reset_for_next_round()
         
         # Draw everything
-        draw_scene(player, npc, game_state, "simultaneous", countdown_value, winner, hit_message)
+        draw_scene(player, npc, terrain, game_state, "simultaneous", countdown_value, winner, hit_message)
         
         pygame.display.flip()
         clock.tick(60)
