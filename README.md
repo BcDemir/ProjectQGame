@@ -1,6 +1,6 @@
 # Wild West Duel Game
 
-A realistic dueling game where you face off against an NPC in a classic Wild West shootout with a reticle-based aiming system, simultaneous firing, realistic ballistic physics, and a health system.
+A realistic dueling game where you face off against an NPC in a classic Wild West shootout with quick-draw arm animations, pistols, realistic ballistic physics, and a health system.
 
 ## Requirements
 
@@ -35,15 +35,19 @@ A realistic dueling game where you face off against an NPC in a classic Wild Wes
 1. **Aiming Phase**:
    - Use UP/DOWN arrow keys to precisely adjust your aim angle
    - A red crosshair reticle shows where you're aiming
+   - Your arm starts in a downward position at your side
    - The NPC will also be adjusting their aim
    - Press SPACE when you're ready to start the countdown
 
 2. **Countdown**:
    - A 3-second countdown will begin (3, 2, 1)
-   - Both duelists will fire automatically when the countdown reaches zero
+   - During the countdown, both duelists perform a quick-draw motion
+   - Arms rapidly raise from their sides to their aiming positions
+   - Watch as the arms animate in a classic quick-draw style
 
 3. **Simultaneous Shooting**:
-   - Both you and the NPC fire at the same time
+   - Both you and the NPC fire automatically when the countdown reaches zero
+   - Bullets shoot from the tips of the pistols
    - Watch as both bullets travel through the air
    - See if either shot hits its target
 
@@ -60,6 +64,8 @@ A realistic dueling game where you face off against an NPC in a classic Wild Wes
 
 ## Game Features
 
+- Classic quick-draw arm animation from side to aiming position
+- Pistols that fire from their actual positions
 - Simplified controls focusing only on angle adjustment
 - Fixed bullet velocity for consistent shooting
 - Precise aiming with 0.10 degree increments for fine control
@@ -81,6 +87,7 @@ A realistic dueling game where you face off against an NPC in a classic Wild Wes
 - **Fixed Velocity**: All bullets travel at the same speed
 - **Angle**: Determines the launch angle of the bullet with precise 0.10 degree control
 - **Reticle**: Shows where you're aiming, positioned closer to the player for better control
+- **Quick-Draw Animation**: Arms rapidly animate from side position to aiming position during countdown
 
 ## Strategy Tips
 
@@ -89,6 +96,7 @@ A realistic dueling game where you face off against an NPC in a classic Wild Wes
 - Try to predict where your opponent will be aiming
 - Adjust your aim based on previous misses
 - Watch the trajectory of your opponent's shots to improve your own aim
+- Pay attention to the arm animation to see where your opponent is aiming
 
 ## Future Improvements
 

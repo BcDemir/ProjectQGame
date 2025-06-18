@@ -143,6 +143,14 @@ class Player:
         self.aim_angle = 0  # Angle in degrees (0 is horizontal)
         self.bullet_velocity = 35  # Fixed bullet velocity (was aim_power)
         
+        # Arm and pistol properties
+        self.arm_length = 25
+        self.arm_width = 5
+        self.pistol_length = 15
+        self.current_arm_angle = -45 * self.aim_direction  # Start downward (-45 degrees)
+        self.target_arm_angle = self.aim_angle  # Target angle for animation
+        self.arm_animation_speed = 5  # Increased speed for quicker draw
+        
         # Reticle properties
         self.reticle_x = 0
         self.reticle_y = 0
@@ -154,19 +162,31 @@ class Player:
         # Draw head
         pygame.draw.circle(screen, self.color, (self.x + self.width // 2, self.y - 10), 12)  # Smaller head
         
-        # Calculate gun position
-        gun_x = self.x + self.width if self.is_player else self.x
-        gun_y = self.aim_y
+        # Calculate arm position - moved higher up on the body
+        arm_start_x = self.x + self.width // 2
+        arm_start_y = self.y + 10  # Upper part of body (was 25)
         
-        # Calculate gun end point based on angle
-        angle_rad = math.radians(self.aim_angle)
-        gun_length = 20  # Shorter gun
-        direction = self.aim_direction
-        gun_end_x = gun_x + (gun_length * math.cos(angle_rad) * direction)
-        gun_end_y = gun_y - (gun_length * math.sin(angle_rad))
+        # Calculate arm end point based on current arm angle
+        arm_angle_rad = math.radians(self.current_arm_angle * self.aim_direction)
+        arm_end_x = arm_start_x + (self.arm_length * math.cos(arm_angle_rad))
+        arm_end_y = arm_start_y - (self.arm_length * math.sin(arm_angle_rad))
         
-        # Draw gun
-        pygame.draw.line(screen, BLACK, (gun_x, gun_y), (gun_end_x, gun_end_y), 3)  # Thinner gun
+        # Draw arm with black outline
+        # First draw a slightly thicker black line for the outline
+        pygame.draw.line(screen, BLACK, (arm_start_x, arm_start_y), 
+                        (arm_end_x, arm_end_y), self.arm_width + 2)
+        # Then draw the colored arm on top
+        pygame.draw.line(screen, self.color, (arm_start_x, arm_start_y), 
+                        (arm_end_x, arm_end_y), self.arm_width)
+        
+        # Calculate pistol position at the end of arm
+        pistol_angle_rad = arm_angle_rad
+        pistol_end_x = arm_end_x + (self.pistol_length * math.cos(pistol_angle_rad))
+        pistol_end_y = arm_end_y - (self.pistol_length * math.sin(pistol_angle_rad))
+        
+        # Draw pistol
+        pygame.draw.line(screen, BLACK, (arm_end_x, arm_end_y), 
+                        (pistol_end_x, pistol_end_y), 3)
         
         # Draw reticle if in aiming phase and is player
         if aiming and self.is_player:
@@ -186,14 +206,32 @@ class Player:
             angle_text = font_small.render(f"Angle: {self.aim_angle:.2f}°", True, BLACK)
             screen.blit(angle_text, (self.x, self.y - 60))
             
+    def update_arm_animation(self):
+        # Animate the arm to move toward the target angle
+        if self.current_arm_angle != self.aim_angle:
+            # Calculate the difference
+            angle_diff = self.aim_angle - self.current_arm_angle
+            
+            # Determine the direction and amount to move
+            if abs(angle_diff) < self.arm_animation_speed:
+                # If we're close enough, just set to the target
+                self.current_arm_angle = self.aim_angle
+            else:
+                # Otherwise move in the right direction
+                direction = 1 if angle_diff > 0 else -1
+                self.current_arm_angle += direction * self.arm_animation_speed
+                
     def adjust_aim_angle(self, direction):
         # Adjust aim angle (up/down) with finer control (0.10 degrees per adjustment)
         self.aim_angle += direction * 0.10
         # Limit angle to reasonable range (0-60 degrees)
         self.aim_angle = max(0, min(self.aim_angle, 60))
         
-        # Update aim_y based on angle for compatibility
-        self.aim_y = self.y + 25 - (self.aim_angle * 0.8)  # Adjusted for smaller height
+        # Update aim_y based on angle for compatibility - adjusted for upper body position
+        self.aim_y = self.y + 10 - (self.aim_angle * 0.8)
+        
+        # Update target arm angle for animation
+        self.target_arm_angle = self.aim_angle
         
         # Calculate reticle position for visual feedback
         self.update_reticle_position()
@@ -234,18 +272,21 @@ class Player:
             self.has_shot = True
             self.shot_time = pygame.time.get_ticks()
             
-            # Calculate gun position
-            gun_x = self.x + self.width if self.is_player else self.x
-            gun_y = self.aim_y
+            # Calculate pistol position at the end of arm - using upper body position
+            arm_start_x = self.x + self.width // 2
+            arm_start_y = self.y + 10  # Upper part of body
             
-            # Calculate gun end point based on angle
-            angle_rad = math.radians(self.aim_angle)
-            gun_length = 20  # Shorter gun
-            gun_end_x = gun_x + (gun_length * math.cos(angle_rad) * self.aim_direction)
-            gun_end_y = gun_y - (gun_length * math.sin(angle_rad))
+            arm_angle_rad = math.radians(self.current_arm_angle * self.aim_direction)
+            arm_end_x = arm_start_x + (self.arm_length * math.cos(arm_angle_rad))
+            arm_end_y = arm_start_y - (self.arm_length * math.sin(arm_angle_rad))
             
-            # Create bullet - using fixed velocity
-            self.bullet = Bullet(gun_end_x, gun_end_y, self.aim_angle, self.bullet_velocity, self.is_player)
+            pistol_angle_rad = arm_angle_rad
+            pistol_end_x = arm_end_x + (self.pistol_length * math.cos(pistol_angle_rad))
+            pistol_end_y = arm_end_y - (self.pistol_length * math.sin(pistol_angle_rad))
+            
+            # Create bullet - using fixed velocity and current arm angle
+            self.bullet = Bullet(pistol_end_x, pistol_end_y, 
+                                self.current_arm_angle, self.bullet_velocity, self.is_player)
                 
     def update_bullet(self):
         if self.bullet and self.bullet.active:
@@ -356,6 +397,11 @@ def main():
         npc.bullet = None
         player.has_shot = False
         npc.has_shot = False
+        
+        # Reset arm positions to downward position
+        player.current_arm_angle = -45 * player.aim_direction
+        npc.current_arm_angle = -45 * npc.aim_direction
+        
         # Reset game state
         game_state = "aiming"
         hit_message = None
@@ -412,6 +458,10 @@ def main():
                         # Reset NPC aim behavior
                         npc_aim_angle_change = random.choice([-1, 0, 1])
                         npc_last_aim_time = pygame.time.get_ticks()
+                        
+                        # Make sure arms start in downward position
+                        player.current_arm_angle = -45 * player.aim_direction
+                        npc.current_arm_angle = -45 * npc.aim_direction
                     elif event.key == pygame.K_q:
                         running = False
             
@@ -445,6 +495,15 @@ def main():
         
         elif game_state == "countdown":
             elapsed = current_time - countdown_start
+            
+            # Animate arms to move toward target angle during countdown
+            player.target_arm_angle = player.aim_angle
+            npc.target_arm_angle = npc.aim_angle
+            
+            # Update arm animations
+            player.update_arm_animation()
+            npc.update_arm_animation()
+            
             if elapsed < 1000:
                 countdown_value = 3
             elif elapsed < 2000:
