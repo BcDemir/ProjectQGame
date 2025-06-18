@@ -145,6 +145,11 @@ class Player:
         self.min_power = 20  # Increased minimum power
         self.max_power = 50  # Increased maximum power
         
+        # Reticle properties
+        self.reticle_x = 0
+        self.reticle_y = 0
+        self.update_reticle_position()  # Initialize reticle position
+        
     def draw(self, screen, aiming=False):
         # Draw body
         pygame.draw.rect(screen, self.color, (self.x, self.y, self.width, self.height))
@@ -165,16 +170,19 @@ class Player:
         # Draw gun
         pygame.draw.line(screen, BLACK, (gun_x, gun_y), (gun_end_x, gun_end_y), 3)  # Thinner gun
         
-        # Draw aiming line and trajectory prediction if in aiming phase
+        # Draw reticle if in aiming phase and is player
         if aiming and self.is_player:
-            # Draw aiming line
-            line_length = 50
-            line_end_x = gun_end_x + (line_length * math.cos(angle_rad) * self.aim_direction)
-            line_end_y = gun_end_y - (line_length * math.sin(angle_rad))
-            pygame.draw.line(screen, YELLOW, (gun_end_x, gun_end_y), (line_end_x, line_end_y), 2)
-            
-            # Draw trajectory prediction (simplified)
-            self.draw_trajectory_prediction(screen, gun_end_x, gun_end_y)
+            # Draw reticle
+            reticle_size = 10
+            # Outer circle
+            pygame.draw.circle(screen, RED, (int(self.reticle_x), int(self.reticle_y)), reticle_size, 1)
+            # Inner circle
+            pygame.draw.circle(screen, RED, (int(self.reticle_x), int(self.reticle_y)), reticle_size // 2, 1)
+            # Crosshairs
+            pygame.draw.line(screen, RED, (self.reticle_x - reticle_size, self.reticle_y), 
+                            (self.reticle_x + reticle_size, self.reticle_y), 1)
+            pygame.draw.line(screen, RED, (self.reticle_x, self.reticle_y - reticle_size), 
+                            (self.reticle_x, self.reticle_y + reticle_size), 1)
             
             # Draw power meter
             power_percentage = (self.aim_power - self.min_power) / (self.max_power - self.min_power)
@@ -196,55 +204,48 @@ class Player:
             screen.blit(angle_text, (self.x, self.y - 80))
             screen.blit(power_text, (self.x, self.y - 60))
             
-    def draw_trajectory_prediction(self, screen, start_x, start_y):
-        # Very limited trajectory prediction
-        points = []
-        
-        # Calculate initial velocity components
-        angle_rad = math.radians(self.aim_angle)
-        vx = math.cos(angle_rad) * self.aim_power * self.aim_direction
-        vy = -math.sin(angle_rad) * self.aim_power
-        
-        # Simulate trajectory - but only for a short distance
-        sim_x, sim_y = start_x, start_y
-        max_prediction_steps = 15  # Very short prediction
-        
-        for _ in range(max_prediction_steps):
-            sim_x += vx
-            sim_y += vy
-            vy += GRAVITY / 2
-            
-            # Stop if prediction hits ground or goes out of bounds
-            if sim_y > GROUND_LEVEL or sim_x < 0 or sim_x > WIDTH:
-                break
-                
-            points.append((int(sim_x), int(sim_y)))
-            
-        # Draw trajectory dots - only the first few points
-        max_visible_points = min(10, len(points))  # Show at most 10 points
-        visible_points = points[:max_visible_points]
-        
-        for i, point in enumerate(visible_points):
-            # Make dots fade out very quickly
-            alpha = 255 - int(255 * ((i+1) / (max_visible_points+1)) ** 1.5)  # Faster fade with exponential
-            dot_color = YELLOW
-            dot_size = 2 if i < 3 else 1  # Smaller dots for distant points
-            pygame.draw.circle(screen, dot_color, point, dot_size)
-            
     def adjust_aim_angle(self, direction):
-        # Adjust aim angle (up/down)
-        self.aim_angle += direction * 2
-        # Limit angle to reasonable range (0-90 degrees)
+        # Adjust aim angle (up/down) with finer control (0.10 degrees per adjustment)
+        self.aim_angle += direction * 0.10
+        # Limit angle to reasonable range (0-60 degrees)
         self.aim_angle = max(0, min(self.aim_angle, 60))
         
         # Update aim_y based on angle for compatibility
         self.aim_y = self.y + 25 - (self.aim_angle * 0.8)  # Adjusted for smaller height
+        
+        # Calculate reticle position for visual feedback
+        self.update_reticle_position()
         
     def adjust_aim_power(self, direction):
         # Adjust aim power (stronger/weaker)
         self.aim_power += direction
         # Limit power to reasonable range
         self.aim_power = max(self.min_power, min(self.aim_power, self.max_power))
+        
+        # Update reticle position for visual feedback
+        self.update_reticle_position()
+        
+    def update_reticle_position(self):
+        # Calculate reticle position based on current angle and power
+        angle_rad = math.radians(self.aim_angle)
+        distance_multiplier = 2.5  # Reduced from 5 to make reticle twice as close
+        
+        # Calculate gun position
+        gun_x = self.x + self.width if self.is_player else self.x
+        gun_y = self.aim_y
+        
+        # Calculate gun end point
+        gun_length = 20
+        gun_end_x = gun_x + (gun_length * math.cos(angle_rad) * self.aim_direction)
+        gun_end_y = gun_y - (gun_length * math.sin(angle_rad))
+        
+        # Calculate reticle position
+        self.reticle_x = gun_end_x + (math.cos(angle_rad) * self.aim_power * distance_multiplier * self.aim_direction)
+        self.reticle_y = gun_end_y - (math.sin(angle_rad) * self.aim_power * distance_multiplier)
+        
+        # Ensure reticle stays within screen bounds
+        self.reticle_x = max(0, min(self.reticle_x, WIDTH))
+        self.reticle_y = max(0, min(self.reticle_y, GROUND_LEVEL))
             
     def shoot(self):
         if not self.has_shot:
@@ -261,7 +262,7 @@ class Player:
             gun_end_x = gun_x + (gun_length * math.cos(angle_rad) * self.aim_direction)
             gun_end_y = gun_y - (gun_length * math.sin(angle_rad))
             
-            # Create bullet
+            # Create bullet - using the same angle and power that positions the reticle
             self.bullet = Bullet(gun_end_x, gun_end_y, self.aim_angle, self.aim_power, self.is_player)
                 
     def update_bullet(self):
@@ -346,6 +347,19 @@ def main():
     winner = None
     hit_message = None
     
+    # Key state tracking for continuous adjustments
+    keys_pressed = {
+        pygame.K_UP: False,
+        pygame.K_DOWN: False,
+        pygame.K_LEFT: False,
+        pygame.K_RIGHT: False
+    }
+    
+    # Key repeat settings
+    key_repeat_delay = 100  # ms before starting to repeat
+    key_repeat_interval = 30  # ms between repeats
+    last_key_action_time = 0
+    
     # NPC variables
     npc_aim_angle_change = 0
     npc_aim_power_change = 0
@@ -393,7 +407,12 @@ def main():
                 running = False
                 
             if event.type == pygame.KEYDOWN:
-                # Player controls during aiming
+                # Track key press state for continuous adjustments
+                if event.key in keys_pressed:
+                    keys_pressed[event.key] = True
+                    last_key_action_time = current_time - key_repeat_delay  # Allow immediate action
+                
+                # Player controls during aiming - immediate response
                 if game_state == "aiming":
                     if event.key == pygame.K_UP:
                         player.adjust_aim_angle(1)  # Increase angle
@@ -426,6 +445,27 @@ def main():
                         npc_last_aim_time = pygame.time.get_ticks()
                     elif event.key == pygame.K_q:
                         running = False
+            
+            elif event.type == pygame.KEYUP:
+                # Track key release
+                if event.key in keys_pressed:
+                    keys_pressed[event.key] = False
+        
+        # Handle continuous key presses for aiming adjustments
+        if game_state == "aiming" and current_time - last_key_action_time > key_repeat_interval:
+            if keys_pressed[pygame.K_UP]:
+                player.adjust_aim_angle(1)
+                last_key_action_time = current_time
+            elif keys_pressed[pygame.K_DOWN]:
+                player.adjust_aim_angle(-1)
+                last_key_action_time = current_time
+            
+            if keys_pressed[pygame.K_RIGHT]:
+                player.adjust_aim_power(1)
+                last_key_action_time = current_time
+            elif keys_pressed[pygame.K_LEFT]:
+                player.adjust_aim_power(-1)
+                last_key_action_time = current_time
         
         # Update game state based on current state
         if game_state == "aiming":
