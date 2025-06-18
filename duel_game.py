@@ -29,7 +29,7 @@ font_medium = pygame.font.SysFont('Arial', 36)
 font_small = pygame.font.SysFont('Arial', 24)
 
 # Physics constants
-GRAVITY = 0.5
+GRAVITY = 0.3  # Reduced gravity to account for longer distances
 GROUND_LEVEL = HEIGHT - 100
 
 class Bullet:
@@ -40,13 +40,14 @@ class Bullet:
         self.speed = speed
         self.is_player = is_player
         self.active = True
-        self.radius = 5
+        self.radius = 3  # Smaller bullet
         self.trail = []  # Store positions for bullet trail
-        self.max_trail_length = 10
+        self.max_trail_length = 15  # Longer trail for better visibility at distance
         
         # Convert angle to radians and calculate velocity components
         angle_rad = math.radians(angle)
-        self.vx = math.cos(angle_rad) * speed * (1 if is_player else -1)
+        direction = 1 if is_player else -1
+        self.vx = math.cos(angle_rad) * speed * direction
         self.vy = -math.sin(angle_rad) * speed  # Negative because y increases downward
         
     def update(self):
@@ -96,19 +97,31 @@ class Bullet:
             return False
             
         # Check if bullet is in the vertical range of the player
-        if (self.y > player.y - 15 - 20 and  # Head top (with radius)
+        if (self.y > player.y - 10 - 12 and  # Head top (with radius)
             self.y < player.y + player.height):  # Body bottom
             
             # Check horizontal position
             if self.is_player:  # Player bullet
-                if self.x > player.x - 20:  # Account for head radius
+                if self.x > player.x - 12:  # Account for head radius
                     self.active = False
-                    player.health -= 100
+                    # Calculate damage based on hit location
+                    if self.y < player.y:  # Headshot
+                        damage = 40
+                    else:  # Body shot
+                        damage = 20
+                    player.health -= damage
+                    player.health = max(0, player.health)  # Ensure health doesn't go below 0
                     return True
             else:  # NPC bullet
-                if self.x < player.x + player.width + 20:  # Account for head radius
+                if self.x < player.x + player.width + 12:  # Account for head radius
                     self.active = False
-                    player.health -= 100
+                    # Calculate damage based on hit location
+                    if self.y < player.y:  # Headshot
+                        damage = 40
+                    else:  # Body shot
+                        damage = 20
+                    player.health -= damage
+                    player.health = max(0, player.health)  # Ensure health doesn't go below 0
                     return True
         return False
 
@@ -116,26 +129,27 @@ class Player:
     def __init__(self, x, y, color, is_player=False):
         self.x = x
         self.y = y
-        self.width = 50
-        self.height = 100
+        self.width = 30  # Reduced from 50
+        self.height = 60  # Reduced from 100
         self.color = color
         self.has_shot = False
         self.shot_time = 0
         self.bullet = None
-        self.health = 100
+        self.health = 100  # Starting health
+        self.max_health = 100  # Maximum health
         self.is_player = is_player
-        self.aim_y = y + 45  # Default aim height
+        self.aim_y = y + 25  # Adjusted for smaller height
         self.aim_direction = 1 if is_player else -1  # 1 for right, -1 for left
         self.aim_angle = 0  # Angle in degrees (0 is horizontal)
-        self.aim_power = 25  # Initial bullet speed
-        self.min_power = 15
-        self.max_power = 35
+        self.aim_power = 35  # Increased initial bullet speed for longer distance
+        self.min_power = 20  # Increased minimum power
+        self.max_power = 50  # Increased maximum power
         
     def draw(self, screen, aiming=False):
         # Draw body
         pygame.draw.rect(screen, self.color, (self.x, self.y, self.width, self.height))
         # Draw head
-        pygame.draw.circle(screen, self.color, (self.x + self.width // 2, self.y - 15), 20)
+        pygame.draw.circle(screen, self.color, (self.x + self.width // 2, self.y - 10), 12)  # Smaller head
         
         # Calculate gun position
         gun_x = self.x + self.width if self.is_player else self.x
@@ -143,12 +157,13 @@ class Player:
         
         # Calculate gun end point based on angle
         angle_rad = math.radians(self.aim_angle)
-        gun_length = 30
-        gun_end_x = gun_x + (gun_length * math.cos(angle_rad) * self.aim_direction)
+        gun_length = 20  # Shorter gun
+        direction = self.aim_direction
+        gun_end_x = gun_x + (gun_length * math.cos(angle_rad) * direction)
         gun_end_y = gun_y - (gun_length * math.sin(angle_rad))
         
         # Draw gun
-        pygame.draw.line(screen, BLACK, (gun_x, gun_y), (gun_end_x, gun_end_y), 5)
+        pygame.draw.line(screen, BLACK, (gun_x, gun_y), (gun_end_x, gun_end_y), 3)  # Thinner gun
         
         # Draw aiming line and trajectory prediction if in aiming phase
         if aiming and self.is_player:
@@ -182,7 +197,7 @@ class Player:
             screen.blit(power_text, (self.x, self.y - 60))
             
     def draw_trajectory_prediction(self, screen, start_x, start_y):
-        # Simplified trajectory prediction
+        # Very limited trajectory prediction
         points = []
         
         # Calculate initial velocity components
@@ -190,12 +205,14 @@ class Player:
         vx = math.cos(angle_rad) * self.aim_power * self.aim_direction
         vy = -math.sin(angle_rad) * self.aim_power
         
-        # Simulate trajectory
+        # Simulate trajectory - but only for a short distance
         sim_x, sim_y = start_x, start_y
-        for _ in range(30):  # Predict 30 steps ahead
+        max_prediction_steps = 15  # Very short prediction
+        
+        for _ in range(max_prediction_steps):
             sim_x += vx
             sim_y += vy
-            vy += GRAVITY / 2  # Use half gravity for prediction to make it more visible
+            vy += GRAVITY / 2
             
             # Stop if prediction hits ground or goes out of bounds
             if sim_y > GROUND_LEVEL or sim_x < 0 or sim_x > WIDTH:
@@ -203,12 +220,15 @@ class Player:
                 
             points.append((int(sim_x), int(sim_y)))
             
-        # Draw trajectory dots
-        for i, point in enumerate(points):
-            # Make dots fade out
-            alpha = 255 - int(200 * (i / len(points)))
+        # Draw trajectory dots - only the first few points
+        max_visible_points = min(10, len(points))  # Show at most 10 points
+        visible_points = points[:max_visible_points]
+        
+        for i, point in enumerate(visible_points):
+            # Make dots fade out very quickly
+            alpha = 255 - int(255 * ((i+1) / (max_visible_points+1)) ** 1.5)  # Faster fade with exponential
             dot_color = YELLOW
-            dot_size = 2
+            dot_size = 2 if i < 3 else 1  # Smaller dots for distant points
             pygame.draw.circle(screen, dot_color, point, dot_size)
             
     def adjust_aim_angle(self, direction):
@@ -218,7 +238,7 @@ class Player:
         self.aim_angle = max(0, min(self.aim_angle, 60))
         
         # Update aim_y based on angle for compatibility
-        self.aim_y = self.y + 45 - (self.aim_angle * 1.5)
+        self.aim_y = self.y + 25 - (self.aim_angle * 0.8)  # Adjusted for smaller height
         
     def adjust_aim_power(self, direction):
         # Adjust aim power (stronger/weaker)
@@ -237,7 +257,7 @@ class Player:
             
             # Calculate gun end point based on angle
             angle_rad = math.radians(self.aim_angle)
-            gun_length = 30
+            gun_length = 20  # Shorter gun
             gun_end_x = gun_x + (gun_length * math.cos(angle_rad) * self.aim_direction)
             gun_end_y = gun_y - (gun_length * math.sin(angle_rad))
             
@@ -257,37 +277,52 @@ class Player:
             return self.bullet.check_hit(other)
         return False
 
-def draw_scene(player, npc, game_state, countdown=None, winner=None):
+def draw_scene(player, npc, game_state, mode="simultaneous", countdown=None, winner=None, hit_message=None):
     # Draw sky
     screen.fill(SKY_BLUE)
     
     # Draw ground
     pygame.draw.rect(screen, BROWN, (0, GROUND_LEVEL, WIDTH, HEIGHT - GROUND_LEVEL))
     
-    # Draw players - show aiming line only in aiming phase
+    # Draw players - show aiming line for player during aiming phase
     player.draw(screen, game_state == "aiming")
-    npc.draw(screen)
+    npc.draw(screen, False)  # NPC never shows trajectory prediction
     
     # Draw bullets
     player.draw_bullet(screen)
     npc.draw_bullet(screen)
     
     # Draw health bars
+    # Player health bar
     pygame.draw.rect(screen, RED, (50, 20, 200, 20))
-    pygame.draw.rect(screen, GREEN, (50, 20, player.health * 2, 20))
-    pygame.draw.rect(screen, RED, (WIDTH - 250, 20, 200, 20))
-    pygame.draw.rect(screen, GREEN, (WIDTH - 250, 20, npc.health * 2, 20))
+    health_width = int(200 * (player.health / player.max_health))
+    pygame.draw.rect(screen, GREEN, (50, 20, health_width, 20))
     
-    # Draw labels
-    player_label = font_small.render("Player", True, BLACK)
-    npc_label = font_small.render("NPC", True, BLACK)
-    screen.blit(player_label, (50, 45))
-    screen.blit(npc_label, (WIDTH - 250, 45))
+    # NPC health bar
+    pygame.draw.rect(screen, RED, (WIDTH - 250, 20, 200, 20))
+    health_width = int(200 * (npc.health / npc.max_health))
+    pygame.draw.rect(screen, GREEN, (WIDTH - 250, 20, health_width, 20))
+    
+    # Draw health numbers
+    player_health_text = font_small.render(f"{player.health}/{player.max_health}", True, BLACK)
+    npc_health_text = font_small.render(f"{npc.health}/{npc.max_health}", True, BLACK)
+    screen.blit(player_health_text, (50, 45))
+    screen.blit(npc_health_text, (WIDTH - 250, 45))
+    
+    # Draw round indicator
+    if game_state != "game_over":
+        round_text = font_medium.render("Prepare to Duel!", True, BLACK)
+        screen.blit(round_text, (WIDTH // 2 - 100, 20))
+    
+    # Draw hit message if available
+    if hit_message:
+        hit_text = font_medium.render(hit_message, True, RED)
+        screen.blit(hit_text, (WIDTH // 2 - 200, 60))
     
     # Draw game state specific information
     if game_state == "aiming":
         instructions = font_medium.render("UP/DOWN: Angle, LEFT/RIGHT: Power, SPACE: Ready", True, BLACK)
-        screen.blit(instructions, (WIDTH // 2 - 300, 50))
+        screen.blit(instructions, (WIDTH // 2 - 300, 100))
     elif game_state == "countdown" and countdown is not None:
         countdown_text = font_large.render(str(countdown), True, RED)
         screen.blit(countdown_text, (WIDTH // 2 - 20, HEIGHT // 2 - 50))
@@ -300,31 +335,65 @@ def draw_scene(player, npc, game_state, countdown=None, winner=None):
 def main():
     clock = pygame.time.Clock()
     
-    # Create player and NPC with greatly increased distance
-    player = Player(20, HEIGHT - 200, BLUE, is_player=True)
-    npc = Player(WIDTH - 70, HEIGHT - 200, RED)
+    # Create player and NPC with greatly increased distance (3x)
+    player = Player(20, HEIGHT - 150, BLUE, is_player=True)
+    npc = Player(WIDTH - 50, HEIGHT - 150, RED)
     
-    # Game states: "aiming" -> "countdown" -> "duel" -> "game_over"
+    # Game states: "aiming" -> "countdown" -> "shooting" -> "result" -> back to "aiming" or "game_over"
     game_state = "aiming"
     countdown_start = 0
     countdown_value = 3
     winner = None
+    hit_message = None
     
     # NPC variables
-    npc_reaction_time = random.randint(200, 800)
-    duel_start_time = 0
+    npc_aim_angle_change = 0
+    npc_aim_power_change = 0
+    npc_last_aim_time = 0
+    npc_aim_interval = 300  # Time between NPC aim adjustments (ms)
     
-    # Randomize NPC aim
+    # Randomize initial NPC aim
     npc.aim_angle = random.randint(5, 30)
-    npc.aim_power = random.randint(20, 30)
+    npc.aim_power = random.randint(30, 45)  # Increased power for longer distance
+    
+    # Reset function for next round
+    def reset_for_next_round():
+        nonlocal game_state, hit_message, countdown_value
+        # Reset bullets
+        player.bullet = None
+        npc.bullet = None
+        player.has_shot = False
+        npc.has_shot = False
+        # Reset game state
+        game_state = "aiming"
+        hit_message = None
+        countdown_value = 3
+        
+        # Randomize NPC aim for next round
+        npc.aim_angle = random.randint(5, 30)
+        npc.aim_power = random.randint(30, 45)
+        
+        # Reset NPC aim behavior
+        nonlocal npc_aim_angle_change, npc_aim_power_change, npc_last_aim_time
+        npc_aim_angle_change = random.choice([-1, 0, 1])
+        npc_aim_power_change = random.choice([-1, 0, 1])
+        npc_last_aim_time = pygame.time.get_ticks()
+    
+    # Initialize NPC aim behavior
+    npc_aim_angle_change = random.choice([-1, 0, 1])
+    npc_aim_power_change = random.choice([-1, 0, 1])
+    npc_last_aim_time = pygame.time.get_ticks()
     
     running = True
     while running:
+        current_time = pygame.time.get_ticks()
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
                 
             if event.type == pygame.KEYDOWN:
+                # Player controls during aiming
                 if game_state == "aiming":
                     if event.key == pygame.K_UP:
                         player.adjust_aim_angle(1)  # Increase angle
@@ -339,24 +408,44 @@ def main():
                         game_state = "countdown"
                         countdown_start = pygame.time.get_ticks()
                 
+                # Game over controls
                 if game_state == "game_over":
                     if event.key == pygame.K_r:
-                        # Reset game
-                        player = Player(20, HEIGHT - 200, BLUE, is_player=True)
-                        npc = Player(WIDTH - 70, HEIGHT - 200, RED)
+                        # Reset game completely
+                        player = Player(20, HEIGHT - 150, BLUE, is_player=True)
+                        npc = Player(WIDTH - 50, HEIGHT - 150, RED)
                         npc.aim_angle = random.randint(5, 30)
-                        npc.aim_power = random.randint(20, 30)
+                        npc.aim_power = random.randint(30, 45)
                         game_state = "aiming"
-                        countdown_value = 3
                         winner = None
-                        npc_reaction_time = random.randint(200, 800)
+                        hit_message = None
+                        countdown_value = 3
+                        # Reset NPC aim behavior
+                        npc_aim_angle_change = random.choice([-1, 0, 1])
+                        npc_aim_power_change = random.choice([-1, 0, 1])
+                        npc_last_aim_time = pygame.time.get_ticks()
                     elif event.key == pygame.K_q:
                         running = False
         
-        # Update game state
-        current_time = pygame.time.get_ticks()
+        # Update game state based on current state
+        if game_state == "aiming":
+            # NPC randomly adjusts aim periodically
+            if current_time - npc_last_aim_time > npc_aim_interval:
+                # Randomly change aim direction occasionally
+                if random.random() < 0.3:
+                    npc_aim_angle_change = random.choice([-1, 0, 1])
+                if random.random() < 0.3:
+                    npc_aim_power_change = random.choice([-1, 0, 1])
+                
+                # Apply the changes
+                if npc_aim_angle_change != 0:
+                    npc.adjust_aim_angle(npc_aim_angle_change)
+                if npc_aim_power_change != 0:
+                    npc.adjust_aim_power(npc_aim_power_change)
+                
+                npc_last_aim_time = current_time
         
-        if game_state == "countdown":
+        elif game_state == "countdown":
             elapsed = current_time - countdown_start
             if elapsed < 1000:
                 countdown_value = 3
@@ -365,42 +454,72 @@ def main():
             elif elapsed < 3000:
                 countdown_value = 1
             else:
-                game_state = "duel"
-                duel_start_time = current_time
-                countdown_value = "DRAW!"
-        
-        elif game_state == "duel":
-            # Both duelists shoot automatically after the countdown
-            if not player.has_shot:
+                # Both shoot simultaneously after countdown
                 player.shoot()
-                
-            # NPC shoots after reaction time
-            if current_time - duel_start_time > npc_reaction_time and not npc.has_shot:
                 npc.shoot()
-            
-            # Update bullets
+                game_state = "shooting"
+                countdown_value = "FIRE!"
+        
+        elif game_state == "shooting":
+            # Update both bullets
             player.update_bullet()
             npc.update_bullet()
             
-            # Check for hits
-            if player.check_hit(npc):
-                winner = "Player"
-                game_state = "game_over"
+            # Track hits
+            player_hit_npc = False
+            npc_hit_player = False
             
-            if npc.check_hit(player):
+            # Check for player hitting NPC
+            if player.bullet and player.bullet.active:
+                if player.check_hit(npc):
+                    player_hit_npc = True
+                    damage = 40 if player.bullet.y < npc.y else 20
+                    hit_message = f"Player hit NPC for {damage} damage!"
+            
+            # Check for NPC hitting player
+            if npc.bullet and npc.bullet.active:
+                if npc.check_hit(player):
+                    npc_hit_player = True
+                    damage = 40 if npc.bullet.y < player.y else 20
+                    if hit_message:
+                        hit_message += f" NPC hit Player for {damage} damage!"
+                    else:
+                        hit_message = f"NPC hit Player for {damage} damage!"
+            
+            # Check if both bullets are no longer active
+            bullets_done = ((not player.bullet or not player.bullet.active) and 
+                           (not npc.bullet or not npc.bullet.active))
+            
+            if bullets_done:
+                if not player_hit_npc and not npc_hit_player:
+                    hit_message = "Both missed!"
+                game_state = "result"
+                # Store the time when we entered result state
+                main.result_start_time = current_time
+        
+        elif game_state == "result":
+            # Check if anyone has died
+            if player.health <= 0 and npc.health <= 0:
+                winner = "Draw - Both died!"
+                game_state = "game_over"
+            elif player.health <= 0:
                 winner = "NPC"
                 game_state = "game_over"
-                
-            # Check if both bullets are inactive and no one hit
-            if (player.has_shot and npc.has_shot and 
-                ((player.bullet and not player.bullet.active) or not player.bullet) and
-                ((npc.bullet and not npc.bullet.active) or not npc.bullet) and
-                not winner):
-                winner = "Nobody"
+            elif npc.health <= 0:
+                winner = "Player"
                 game_state = "game_over"
+            else:
+                # Wait a moment before next round
+                if not hasattr(main, "result_start_time"):
+                    main.result_start_time = current_time
+                
+                # After 2 seconds, move to next round
+                if current_time - main.result_start_time > 2000:
+                    delattr(main, "result_start_time")
+                    reset_for_next_round()
         
         # Draw everything
-        draw_scene(player, npc, game_state, countdown_value, winner)
+        draw_scene(player, npc, game_state, "simultaneous", countdown_value, winner, hit_message)
         
         pygame.display.flip()
         clock.tick(60)
