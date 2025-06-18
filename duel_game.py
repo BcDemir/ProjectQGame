@@ -33,9 +33,9 @@ GRAVITY = 0.3  # Reduced gravity to account for longer distances
 BASE_GROUND_LEVEL = HEIGHT - 200  # Base ground level for higher resolution
 
 # Terrain generation parameters
-MAX_HILL_HEIGHT = 150  # Maximum height of hills
+MAX_HILL_HEIGHT = 250  # Maximum height of hills
 MIN_HILL_HEIGHT = 30   # Minimum height of hills
-HILL_WIDTH_RANGE = (200, 400)  # Range of hill widths
+HILL_WIDTH_RANGE = (100, 300)  # Range of hill widths
 CENTER_GAP = 600  # Gap in the center to ensure line of sight
 
 # Terrain class to handle the ground and hills
@@ -100,7 +100,7 @@ class Bullet:
         self.speed = speed
         self.is_player = is_player
         self.active = True
-        self.radius = 6  # Larger bullet for higher resolution
+        self.radius = 2  # Larger bullet for higher resolution
         self.trail = []  # Store positions for bullet trail
         self.max_trail_length = 20  # Longer trail for better visibility at distance
         
@@ -208,12 +208,12 @@ class Player:
         self.bullet_velocity = 45  # Increased for larger screen
         
         # Arm and pistol properties - keeping these unchanged
-        self.arm_length = 50  # Keeping arm length unchanged
-        self.arm_width = 10  # Keeping arm width unchanged
-        self.pistol_length = 30  # Keeping pistol length unchanged
-        self.current_arm_angle = -45  # Start downward (-45 degrees), no direction multiplier
+        self.arm_length = 35  # Keeping arm length unchanged
+        self.arm_width = 8  # Keeping arm width unchanged
+        self.pistol_length = 10  # Keeping pistol length unchanged
+        self.current_arm_angle = -70  # Start downward (-45 degrees), no direction multiplier
         self.target_arm_angle = self.aim_angle  # Target angle for animation
-        self.arm_animation_speed = 5  # Increased speed for quicker draw
+        self.arm_animation_speed = 3  # Increased speed for quicker draw
         
         # Reticle properties
         self.reticle_x = 0
@@ -459,8 +459,8 @@ def main():
     Player.terrain = terrain
     
     # Get ground levels for player and NPC positions
-    player_ground_level = terrain.get_ground_level_at(player_x + 15)  # Center of player (half width)
-    npc_ground_level = terrain.get_ground_level_at(npc_x + 15)  # Center of NPC (half width)
+    player_ground_level = terrain.get_ground_level_at(player_x + 30)  # Center of player (half width)
+    npc_ground_level = terrain.get_ground_level_at(npc_x + 30)  # Center of NPC (half width)
     
     # Create player and NPC with positions based on terrain
     player = Player(player_x, player_ground_level - 60, BLUE, is_player=True)  # Height is 60 now
@@ -490,7 +490,7 @@ def main():
     npc_aim_interval = 300  # Time between NPC aim adjustments (ms)
     
     # Randomize initial NPC aim
-    npc.aim_angle = random.randint(5, 30)
+    npc.aim_angle = random.randint(5, 15)
     
     # Reset function for next round
     def reset_for_next_round():
@@ -512,9 +512,9 @@ def main():
         
         # Update player positions
         player.x = player_x
-        player.y = player_ground_level - 120
+        player.y = player_ground_level - 60
         npc.x = npc_x
-        npc.y = npc_ground_level - 120
+        npc.y = npc_ground_level - 60
         
         # Reset arm positions to downward position
         player.current_arm_angle = -45  # No direction multiplier
@@ -581,8 +581,8 @@ def main():
                         npc_ground_level = terrain.get_ground_level_at(npc_x + 30)
                         
                         # Create new players at the correct heights
-                        player = Player(player_x, player_ground_level - 120, BLUE, is_player=True)
-                        npc = Player(npc_x, npc_ground_level - 120, RED)
+                        player = Player(player_x, player_ground_level - 60, BLUE, is_player=True)
+                        npc = Player(npc_x, npc_ground_level - 60, RED)
                         npc.aim_angle = random.randint(5, 30)
                         game_state = "aiming"
                         winner = None
