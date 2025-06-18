@@ -199,7 +199,7 @@ class Player:
             pygame.draw.rect(screen, BLACK, (meter_x, meter_y, meter_width, meter_height), 1)
             
             # Draw angle and power text
-            angle_text = font_small.render(f"Angle: {self.aim_angle}°", True, BLACK)
+            angle_text = font_small.render(f"Angle: {self.aim_angle:.2f}°", True, BLACK)
             power_text = font_small.render(f"Power: {self.aim_power}", True, BLACK)
             screen.blit(angle_text, (self.x, self.y - 80))
             screen.blit(power_text, (self.x, self.y - 60))
