@@ -102,7 +102,7 @@ class Bullet:
         self.active = True
         self.radius = 2  # Larger bullet for higher resolution
         self.trail = []  # Store positions for bullet trail
-        self.max_trail_length = 20  # Longer trail for better visibility at distance
+        self.max_trail_length = 6  # Longer trail for better visibility at distance
         
         # Convert angle to radians and calculate velocity components
         angle_rad = math.radians(angle)
@@ -356,7 +356,7 @@ class Player:
             
             # Calculate pistol position at the end of arm - using upper body position
             arm_start_x = self.x + self.width // 2
-            arm_start_y = self.y + 20  # Upper part of body
+            arm_start_y = self.y + 10  # Upper part of body
             
             # Calculate arm and pistol positions with correct angles for both player and NPC
             if self.is_player:
