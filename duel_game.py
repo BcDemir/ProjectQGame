@@ -141,9 +141,7 @@ class Player:
         self.aim_y = y + 25  # Adjusted for smaller height
         self.aim_direction = 1 if is_player else -1  # 1 for right, -1 for left
         self.aim_angle = 0  # Angle in degrees (0 is horizontal)
-        self.aim_power = 35  # Increased initial bullet speed for longer distance
-        self.min_power = 20  # Increased minimum power
-        self.max_power = 50  # Increased maximum power
+        self.bullet_velocity = 35  # Fixed bullet velocity (was aim_power)
         
         # Reticle properties
         self.reticle_x = 0
@@ -184,25 +182,9 @@ class Player:
             pygame.draw.line(screen, RED, (self.reticle_x, self.reticle_y - reticle_size), 
                             (self.reticle_x, self.reticle_y + reticle_size), 1)
             
-            # Draw power meter
-            power_percentage = (self.aim_power - self.min_power) / (self.max_power - self.min_power)
-            meter_width = 100
-            meter_height = 10
-            meter_x = self.x
-            meter_y = self.y - 50
-            
-            # Draw background
-            pygame.draw.rect(screen, WHITE, (meter_x, meter_y, meter_width, meter_height))
-            # Draw filled portion
-            pygame.draw.rect(screen, RED, (meter_x, meter_y, int(meter_width * power_percentage), meter_height))
-            # Draw border
-            pygame.draw.rect(screen, BLACK, (meter_x, meter_y, meter_width, meter_height), 1)
-            
-            # Draw angle and power text
+            # Draw angle text
             angle_text = font_small.render(f"Angle: {self.aim_angle:.2f}°", True, BLACK)
-            power_text = font_small.render(f"Power: {self.aim_power}", True, BLACK)
-            screen.blit(angle_text, (self.x, self.y - 80))
-            screen.blit(power_text, (self.x, self.y - 60))
+            screen.blit(angle_text, (self.x, self.y - 60))
             
     def adjust_aim_angle(self, direction):
         # Adjust aim angle (up/down) with finer control (0.10 degrees per adjustment)
@@ -226,7 +208,7 @@ class Player:
         self.update_reticle_position()
         
     def update_reticle_position(self):
-        # Calculate reticle position based on current angle and power
+        # Calculate reticle position based on current angle and fixed velocity
         angle_rad = math.radians(self.aim_angle)
         distance_multiplier = 2.5  # Reduced from 5 to make reticle twice as close
         
@@ -239,9 +221,9 @@ class Player:
         gun_end_x = gun_x + (gun_length * math.cos(angle_rad) * self.aim_direction)
         gun_end_y = gun_y - (gun_length * math.sin(angle_rad))
         
-        # Calculate reticle position
-        self.reticle_x = gun_end_x + (math.cos(angle_rad) * self.aim_power * distance_multiplier * self.aim_direction)
-        self.reticle_y = gun_end_y - (math.sin(angle_rad) * self.aim_power * distance_multiplier)
+        # Calculate reticle position using fixed bullet velocity
+        self.reticle_x = gun_end_x + (math.cos(angle_rad) * self.bullet_velocity * distance_multiplier * self.aim_direction)
+        self.reticle_y = gun_end_y - (math.sin(angle_rad) * self.bullet_velocity * distance_multiplier)
         
         # Ensure reticle stays within screen bounds
         self.reticle_x = max(0, min(self.reticle_x, WIDTH))
@@ -262,8 +244,8 @@ class Player:
             gun_end_x = gun_x + (gun_length * math.cos(angle_rad) * self.aim_direction)
             gun_end_y = gun_y - (gun_length * math.sin(angle_rad))
             
-            # Create bullet - using the same angle and power that positions the reticle
-            self.bullet = Bullet(gun_end_x, gun_end_y, self.aim_angle, self.aim_power, self.is_player)
+            # Create bullet - using fixed velocity
+            self.bullet = Bullet(gun_end_x, gun_end_y, self.aim_angle, self.bullet_velocity, self.is_player)
                 
     def update_bullet(self):
         if self.bullet and self.bullet.active:
@@ -322,8 +304,8 @@ def draw_scene(player, npc, game_state, mode="simultaneous", countdown=None, win
     
     # Draw game state specific information
     if game_state == "aiming":
-        instructions = font_medium.render("UP/DOWN: Angle, LEFT/RIGHT: Power, SPACE: Ready", True, BLACK)
-        screen.blit(instructions, (WIDTH // 2 - 300, 100))
+        instructions = font_medium.render("UP/DOWN: Adjust Angle, SPACE: Ready", True, BLACK)
+        screen.blit(instructions, (WIDTH // 2 - 200, 100))
     elif game_state == "countdown" and countdown is not None:
         countdown_text = font_large.render(str(countdown), True, RED)
         screen.blit(countdown_text, (WIDTH // 2 - 20, HEIGHT // 2 - 50))
@@ -350,9 +332,7 @@ def main():
     # Key state tracking for continuous adjustments
     keys_pressed = {
         pygame.K_UP: False,
-        pygame.K_DOWN: False,
-        pygame.K_LEFT: False,
-        pygame.K_RIGHT: False
+        pygame.K_DOWN: False
     }
     
     # Key repeat settings
@@ -362,13 +342,11 @@ def main():
     
     # NPC variables
     npc_aim_angle_change = 0
-    npc_aim_power_change = 0
     npc_last_aim_time = 0
     npc_aim_interval = 300  # Time between NPC aim adjustments (ms)
     
     # Randomize initial NPC aim
     npc.aim_angle = random.randint(5, 30)
-    npc.aim_power = random.randint(30, 45)  # Increased power for longer distance
     
     # Reset function for next round
     def reset_for_next_round():
@@ -385,17 +363,14 @@ def main():
         
         # Randomize NPC aim for next round
         npc.aim_angle = random.randint(5, 30)
-        npc.aim_power = random.randint(30, 45)
         
         # Reset NPC aim behavior
-        nonlocal npc_aim_angle_change, npc_aim_power_change, npc_last_aim_time
+        nonlocal npc_aim_angle_change, npc_last_aim_time
         npc_aim_angle_change = random.choice([-1, 0, 1])
-        npc_aim_power_change = random.choice([-1, 0, 1])
         npc_last_aim_time = pygame.time.get_ticks()
     
     # Initialize NPC aim behavior
     npc_aim_angle_change = random.choice([-1, 0, 1])
-    npc_aim_power_change = random.choice([-1, 0, 1])
     npc_last_aim_time = pygame.time.get_ticks()
     
     running = True
@@ -418,10 +393,6 @@ def main():
                         player.adjust_aim_angle(1)  # Increase angle
                     elif event.key == pygame.K_DOWN:
                         player.adjust_aim_angle(-1)  # Decrease angle
-                    elif event.key == pygame.K_RIGHT:
-                        player.adjust_aim_power(1)  # Increase power
-                    elif event.key == pygame.K_LEFT:
-                        player.adjust_aim_power(-1)  # Decrease power
                     elif event.key == pygame.K_SPACE:
                         # Start countdown when player is ready
                         game_state = "countdown"
@@ -434,14 +405,12 @@ def main():
                         player = Player(20, HEIGHT - 150, BLUE, is_player=True)
                         npc = Player(WIDTH - 50, HEIGHT - 150, RED)
                         npc.aim_angle = random.randint(5, 30)
-                        npc.aim_power = random.randint(30, 45)
                         game_state = "aiming"
                         winner = None
                         hit_message = None
                         countdown_value = 3
                         # Reset NPC aim behavior
                         npc_aim_angle_change = random.choice([-1, 0, 1])
-                        npc_aim_power_change = random.choice([-1, 0, 1])
                         npc_last_aim_time = pygame.time.get_ticks()
                     elif event.key == pygame.K_q:
                         running = False
@@ -459,13 +428,6 @@ def main():
             elif keys_pressed[pygame.K_DOWN]:
                 player.adjust_aim_angle(-1)
                 last_key_action_time = current_time
-            
-            if keys_pressed[pygame.K_RIGHT]:
-                player.adjust_aim_power(1)
-                last_key_action_time = current_time
-            elif keys_pressed[pygame.K_LEFT]:
-                player.adjust_aim_power(-1)
-                last_key_action_time = current_time
         
         # Update game state based on current state
         if game_state == "aiming":
@@ -474,14 +436,10 @@ def main():
                 # Randomly change aim direction occasionally
                 if random.random() < 0.3:
                     npc_aim_angle_change = random.choice([-1, 0, 1])
-                if random.random() < 0.3:
-                    npc_aim_power_change = random.choice([-1, 0, 1])
                 
                 # Apply the changes
                 if npc_aim_angle_change != 0:
                     npc.adjust_aim_angle(npc_aim_angle_change)
-                if npc_aim_power_change != 0:
-                    npc.adjust_aim_power(npc_aim_power_change)
                 
                 npc_last_aim_time = current_time
         

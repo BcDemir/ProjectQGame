@@ -26,8 +26,6 @@ A realistic dueling game where you face off against an NPC in a classic Wild Wes
    - **UP/DOWN Arrow Keys**: Adjust your aim angle (moves the reticle up/down)
      - Press and hold for continuous adjustment
      - Fine-tuned control with 0.10 degree increments
-   - **LEFT/RIGHT Arrow Keys**: Adjust your shot power (moves the reticle closer/further)
-     - Press and hold for continuous adjustment
    - **SPACE**: Start the countdown when you're ready
    - **R**: Restart the game after it ends
    - **Q**: Quit the game
@@ -36,7 +34,6 @@ A realistic dueling game where you face off against an NPC in a classic Wild Wes
 
 1. **Aiming Phase**:
    - Use UP/DOWN arrow keys to precisely adjust your aim angle
-   - Use LEFT/RIGHT arrow keys to adjust your shot power
    - A red crosshair reticle shows where you're aiming
    - The NPC will also be adjusting their aim
    - Press SPACE when you're ready to start the countdown
@@ -63,6 +60,8 @@ A realistic dueling game where you face off against an NPC in a classic Wild Wes
 
 ## Game Features
 
+- Simplified controls focusing only on angle adjustment
+- Fixed bullet velocity for consistent shooting
 - Precise aiming with 0.10 degree increments for fine control
 - Continuous adjustment when keys are held down
 - Compact reticle-based aiming system for intuitive targeting
@@ -71,8 +70,7 @@ A realistic dueling game where you face off against an NPC in a classic Wild Wes
 - Health system with different damage based on hit location
 - Long-distance dueling with small characters
 - Realistic ballistic physics with gravity affecting bullet trajectories
-- Power meter and angle display to help with aiming
-- Adjustable aim angle and shot power
+- Clean UI showing only the essential angle information
 - Bullet trails for visual effect
 - Hit messages showing damage dealt
 - Health bars and numerical health display
@@ -80,7 +78,7 @@ A realistic dueling game where you face off against an NPC in a classic Wild Wes
 ## Physics Elements
 
 - **Gravity**: Bullets are affected by gravity and follow a parabolic trajectory
-- **Power**: Controls the initial velocity of the bullet (higher power needed for longer distances)
+- **Fixed Velocity**: All bullets travel at the same speed
 - **Angle**: Determines the launch angle of the bullet with precise 0.10 degree control
 - **Reticle**: Shows where you're aiming, positioned closer to the player for better control
 
@@ -90,7 +88,6 @@ A realistic dueling game where you face off against an NPC in a classic Wild Wes
 - Hold down the arrow keys for smooth, continuous adjustments
 - Try to predict where your opponent will be aiming
 - Adjust your aim based on previous misses
-- Consider both angle and power for the perfect shot
 - Watch the trajectory of your opponent's shots to improve your own aim
 
 ## Future Improvements
